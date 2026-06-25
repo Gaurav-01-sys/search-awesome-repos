@@ -266,14 +266,28 @@ def fetch_most_forked(query="forks:>1", limit=25):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
-    params = {"q": f"user:{org_handle}", "sort": sort_by, "order": "desc", "per_page": limit}
+    if sort_by == "created":
+        url = f"https://api.github.com/users/{org_handle}/repos"
+        params = {"sort": "created", "direction": "desc", "per_page": limit}
+    else:
+        url = GH_API
+        params = {"q": f"user:{org_handle}", "sort": sort_by, "order": "desc", "per_page": limit}
+        
     try:
-        r = requests.get(GH_API, headers=HEADERS, params=params, timeout=10)
+        r = requests.get(url, headers=HEADERS, params=params, timeout=10)
         data = r.json()
-        if "items" not in data:
-            return [], data.get("message", "Unknown error")
+        
+        if sort_by == "created":
+            if isinstance(data, dict) and "message" in data:
+                return [], data.get("message", "Unknown error")
+            items = data
+        else:
+            if "items" not in data:
+                return [], data.get("message", "Unknown error")
+            items = data["items"]
+            
         rows = []
-        for repo in data["items"]:
+        for repo in items:
             rows.append({
                 "Repository": repo["full_name"],
                 "Stars": f"{repo['stargazers_count']:,}",
@@ -281,7 +295,7 @@ def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
                 "Language": repo["language"] or "—",
                 "Description": repo["description"] or "—",
                 "URL": repo["html_url"],
-                "Updated": repo["updated_at"][:10]
+                "Updated": repo["updated_at"][:10] if repo.get("updated_at") else "—"
             })
         return rows, None
     except Exception as e:
@@ -567,7 +581,14 @@ with tab_orgs:
         custom_org = st.text_input("Or enter a custom GitHub handle/org:", placeholder="e.g. vllm-project", help="Overrides the dropdown selection if provided.")
         
     with c2:
-        org_sort_by = st.selectbox("Sort by", ["stars", "forks", "updated"], key="org_sort")
+        org_sort_options = {
+            "stars": "Most Stars",
+            "forks": "Most Forks",
+            "updated": "Recently Updated",
+            "created": "Newest Added",
+            "help-wanted-issues": "Help Wanted Issues"
+        }
+        org_sort_by = st.selectbox("Sort by", list(org_sort_options.keys()), format_func=lambda x: org_sort_options[x], key="org_sort")
         org_limit = st.slider("Results", 5, 50, 15, key="org_limit")
 
     target_org = custom_org.strip() if custom_org.strip() else org_handle
