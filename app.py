@@ -513,7 +513,8 @@ with tab_orgs:
             "Stability AI": "Stability-AI",
             "Allen Institute for AI (AI2)": "allenai",
             "Hugging Face": "huggingface",
-            "NVIDIA Research": "NVIDIA",
+            "NVIDIA": "NVIDIA",
+            "NVIDIA Labs": "NVlabs",
             "Tsinghua/Zhipu (GLM)": "THUDM",
             "BAAI": "baai-ac"
         },
