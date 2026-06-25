@@ -265,8 +265,8 @@ def fetch_most_forked(query="forks:>1", limit=25):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_org_repos(org_handle, limit=30):
-    params = {"q": f"user:{org_handle}", "sort": "stars", "order": "desc", "per_page": limit}
+def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
+    params = {"q": f"user:{org_handle}", "sort": sort_by, "order": "desc", "per_page": limit}
     try:
         r = requests.get(GH_API, headers=HEADERS, params=params, timeout=10)
         data = r.json()
@@ -546,13 +546,14 @@ with tab_orgs:
         custom_org = st.text_input("Or enter a custom GitHub handle/org:", placeholder="e.g. vllm-project", help="Overrides the dropdown selection if provided.")
         
     with c2:
+        org_sort_by = st.selectbox("Sort by", ["stars", "forks", "updated"], key="org_sort")
         org_limit = st.slider("Results", 5, 50, 15, key="org_limit")
 
     target_org = custom_org.strip() if custom_org.strip() else org_handle
 
     if st.button("Fetch Org Repos", key="btn_orgs"):
         with st.spinner(f"Fetching repos for @{target_org}…"):
-            rows, err = fetch_org_repos(target_org, org_limit)
+            rows, err = fetch_org_repos(target_org, org_limit, org_sort_by)
         if err:
             st.error(f"API Error: {err}")
         elif not rows:
