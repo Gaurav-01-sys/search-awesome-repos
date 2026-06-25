@@ -8,8 +8,15 @@ st.set_page_config(
     page_title="GitHub Explorer",
     page_icon="🔥",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
+
+with st.sidebar:
+    st.markdown("### ⚙️ Settings")
+    st.markdown("GitHub limits unauthenticated API requests to 60/hour. To browse without limits (5,000/hour), paste a Personal Access Token below.")
+    gh_token = st.text_input("GitHub PAT (Optional)", type="password", help="Your token is only used locally and never stored.")
+    if gh_token:
+        st.success("Token active!")
 
 # ── Custom CSS ──────────────────────────────────────────────────────────────
 st.markdown("""
@@ -176,6 +183,27 @@ html, body, .stApp {
 .stars { color: #f4c542; font-size: 0.78rem; font-family: 'Space Mono', monospace; }
 .forks { color: #4f8ef7; font-size: 0.78rem; font-family: 'Space Mono', monospace; margin-left: 8px; }
 
+.topic-pill {
+    display: inline-block;
+    background: #1e233088;
+    border: 1px solid #2a3145;
+    color: #a0aec0;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.65rem;
+    margin-right: 6px;
+    margin-bottom: 4px;
+}
+
+.badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    margin-left: 12px;
+    color: #6b7280;
+}
+.badge-lic { color: #a78bfa; }
+.badge-upd { color: #34d399; }
+
 /* ── Alert / info ── */
 .stAlert { border-radius: 10px !important; }
 
@@ -202,18 +230,23 @@ st.markdown("""
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
-HEADERS = {"User-Agent": "Mozilla/5.0 GitHubExplorer/1.0"}
+def get_headers(token=None):
+    h = {"User-Agent": "Mozilla/5.0 GitHubExplorer/1.0"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return h
+
 GH_API = "https://api.github.com/search/repositories"
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_trending(period="daily", language=""):
+def fetch_trending(period="daily", language="", token=""):
     url = f"https://github.com/trending"
     params = {"since": period}
     if language:
         params["l"] = language
     try:
-        r = requests.get(url, headers=HEADERS, params=params, timeout=10)
+        r = requests.get(url, headers=get_headers(token), params=params, timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
         articles = soup.find_all("article", class_="Box-row")
         rows = []
@@ -242,22 +275,27 @@ def fetch_trending(period="daily", language=""):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_most_forked(query="forks:>1", limit=25):
+def fetch_most_forked(query="forks:>1", limit=25, token=""):
     params = {"q": query, "sort": "forks", "order": "desc", "per_page": limit}
     try:
-        r = requests.get(GH_API, headers=HEADERS, params=params, timeout=10)
+        r = requests.get(GH_API, headers=get_headers(token), params=params, timeout=10)
         data = r.json()
         if "items" not in data:
             return [], data.get("message", "Unknown error")
         rows = []
         for repo in data["items"]:
+            topics = repo.get("topics", [])
+            lic = repo.get("license")
             rows.append({
                 "Repository": repo["full_name"],
                 "Stars": f"{repo['stargazers_count']:,}",
                 "Forks": f"{repo['forks_count']:,}",
                 "Language": repo["language"] or "—",
                 "Description": repo["description"] or "—",
-                "URL": repo["html_url"]
+                "URL": repo["html_url"],
+                "Topics": topics[:4],
+                "License": lic.get("spdx_id") if lic else None,
+                "Updated": repo["updated_at"][:10] if repo.get("updated_at") else "—"
             })
         return rows, None
     except Exception as e:
@@ -265,7 +303,7 @@ def fetch_most_forked(query="forks:>1", limit=25):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
+def fetch_org_repos(org_handle, limit=30, sort_by="stars", token=""):
     if sort_by == "created":
         url = f"https://api.github.com/users/{org_handle}/repos"
         params = {"sort": "created", "direction": "desc", "per_page": limit}
@@ -274,7 +312,7 @@ def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
         params = {"q": f"user:{org_handle}", "sort": sort_by, "order": "desc", "per_page": limit}
         
     try:
-        r = requests.get(url, headers=HEADERS, params=params, timeout=10)
+        r = requests.get(url, headers=get_headers(token), params=params, timeout=10)
         data = r.json()
         
         if sort_by == "created":
@@ -288,6 +326,8 @@ def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
             
         rows = []
         for repo in items:
+            topics = repo.get("topics", [])
+            lic = repo.get("license")
             rows.append({
                 "Repository": repo["full_name"],
                 "Stars": f"{repo['stargazers_count']:,}",
@@ -295,6 +335,8 @@ def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
                 "Language": repo["language"] or "—",
                 "Description": repo["description"] or "—",
                 "URL": repo["html_url"],
+                "Topics": topics[:4],
+                "License": lic.get("spdx_id") if lic else None,
                 "Updated": repo["updated_at"][:10] if repo.get("updated_at") else "—"
             })
         return rows, None
@@ -303,22 +345,27 @@ def fetch_org_repos(org_handle, limit=30, sort_by="stars"):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_most_starred(query="stars:>1", limit=25):
+def fetch_most_starred(query="stars:>1", limit=25, token=""):
     params = {"q": query, "sort": "stars", "order": "desc", "per_page": limit}
     try:
-        r = requests.get(GH_API, headers=HEADERS, params=params, timeout=10)
+        r = requests.get(GH_API, headers=get_headers(token), params=params, timeout=10)
         data = r.json()
         if "items" not in data:
             return [], data.get("message", "Unknown error")
         rows = []
         for repo in data["items"]:
+            topics = repo.get("topics", [])
+            lic = repo.get("license")
             rows.append({
                 "Repository": repo["full_name"],
                 "Stars": f"{repo['stargazers_count']:,}",
                 "Forks": f"{repo['forks_count']:,}",
                 "Language": repo["language"] or "—",
                 "Description": repo["description"] or "—",
-                "URL": repo["html_url"]
+                "URL": repo["html_url"],
+                "Topics": topics[:4],
+                "License": lic.get("spdx_id") if lic else None,
+                "Updated": repo["updated_at"][:10] if repo.get("updated_at") else "—"
             })
         return rows, None
     except Exception as e:
@@ -326,22 +373,27 @@ def fetch_most_starred(query="stars:>1", limit=25):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_search(keyword, limit=30, sort_by="stars"):
+def fetch_search(keyword, limit=30, sort_by="stars", token=""):
     params = {"q": f"{keyword} in:name", "sort": sort_by, "order": "desc", "per_page": limit}
     try:
-        r = requests.get(GH_API, headers=HEADERS, params=params, timeout=10)
+        r = requests.get(GH_API, headers=get_headers(token), params=params, timeout=10)
         data = r.json()
         if "items" not in data:
             return [], data.get("message", "Unknown error")
         rows = []
         for repo in data["items"]:
+            topics = repo.get("topics", [])
+            lic = repo.get("license")
             rows.append({
                 "Repository": repo["full_name"],
                 "Stars": f"{repo['stargazers_count']:,}",
+                "Forks": f"{repo['forks_count']:,}",
                 "Language": repo["language"] or "—",
                 "Description": repo["description"] or "—",
                 "URL": repo["html_url"],
-                "Updated": repo["updated_at"][:10]
+                "Topics": topics[:4],
+                "License": lic.get("spdx_id") if lic else None,
+                "Updated": repo["updated_at"][:10] if repo.get("updated_at") else "—"
             })
         return rows, None
     except Exception as e:
@@ -356,16 +408,36 @@ def render_repo_cards(rows, rank=True):
         lang = r.get("Language", "—")
         stars = r.get("Stars Today") or r.get("Stars", "")
         forks = r.get("Forks", "")
+        updated = r.get("Updated", "")
+        lic = r.get("License")
+        topics = r.get("Topics", [])
         
         forks_html = f'<span class="forks">🍴 {forks}</span>' if forks else ""
         rank_html = f'<span class="rank">#{i}</span>' if rank else ""
+        
+        # Build extra metadata badges
+        meta_html = ""
+        if lic:
+            meta_html += f'<span class="badge badge-lic">⚖️ {lic}</span>'
+        if updated and updated != "—":
+            meta_html += f'<span class="badge badge-upd">📅 {updated}</span>'
+            
+        # Build topics HTML
+        topics_html = ""
+        if topics:
+            topics_html = '<div style="margin: 8px 0;">' + "".join([f'<span class="topic-pill">{t}</span>' for t in topics]) + '</div>'
+            
         st.markdown(f"""
         <div class="repo-card">
           {rank_html}
           <div><a class="name" href="{url}" target="_blank">⬡ {name}</a></div>
           <p class="desc">{desc}</p>
-          <span class="tag">{lang}</span>
-          <span class="stars">⭐ {stars}</span>{forks_html}
+          {topics_html}
+          <div style="margin-top: 10px;">
+              <span class="tag">{lang}</span>
+              <span class="stars">⭐ {stars}</span>{forks_html}
+              {meta_html}
+          </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -397,7 +469,7 @@ with tab1:
 
     if st.button("Fetch Trending Repos", key="btn_trend"):
         with st.spinner("Scraping GitHub Trending…"):
-            rows, err = fetch_trending(period, lang_filter.lower().strip())
+            rows, err = fetch_trending(period, lang_filter.lower().strip(), gh_token)
         if err:
             st.error(f"Error: {err}")
         elif not rows:
@@ -438,7 +510,7 @@ with tab2:
 
     if st.button("Fetch Most Starred", key="btn_star"):
         with st.spinner("Querying GitHub API…"):
-            rows, err = fetch_most_starred(star_query, star_limit)
+            rows, err = fetch_most_starred(star_query, star_limit, gh_token)
         if err:
             st.error(f"API Error: {err}")
         elif not rows:
@@ -472,7 +544,7 @@ with tab_forked:
 
     if st.button("Fetch Most Forked", key="btn_fork"):
         with st.spinner("Querying GitHub API…"):
-            rows, err = fetch_most_forked(fork_query, fork_limit)
+            rows, err = fetch_most_forked(fork_query, fork_limit, gh_token)
         if err:
             st.error(f"API Error: {err}")
         elif not rows:
@@ -595,7 +667,7 @@ with tab_orgs:
 
     if st.button("Fetch Org Repos", key="btn_orgs"):
         with st.spinner(f"Fetching repos for @{target_org}…"):
-            rows, err = fetch_org_repos(target_org, org_limit, org_sort_by)
+            rows, err = fetch_org_repos(target_org, org_limit, org_sort_by, gh_token)
         if err:
             st.error(f"API Error: {err}")
         elif not rows:
@@ -624,7 +696,7 @@ with tab3:
     if st.button("Find Awesome Lists", key="btn_awesome"):
         kw = f"awesome-{awesome_topic.strip()}" if awesome_topic.strip() else "awesome"
         with st.spinner(f"Searching for {kw}…"):
-            rows, err = fetch_search(kw, awesome_limit)
+            rows, err = fetch_search(kw, awesome_limit, "stars", gh_token)
         if err:
             st.error(f"API Error: {err}")
         elif not rows:
@@ -663,7 +735,7 @@ with tab4:
             st.warning("Please enter a keyword.")
         else:
             with st.spinner(f"Searching for '{search_kw}'…"):
-                rows, err = fetch_search(search_kw, search_limit, sort_by)
+                rows, err = fetch_search(search_kw, search_limit, sort_by, gh_token)
             if err:
                 st.error(f"API Error: {err}")
             elif not rows:
