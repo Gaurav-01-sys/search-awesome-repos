@@ -491,23 +491,30 @@ with tab_orgs:
             "Anthropic": "anthropics",
             "Google DeepMind": "google-deepmind",
             "Meta AI / FAIR": "facebookresearch",
+            "Meta Llama": "meta-llama",
             "xAI": "xai-org",
             "Mistral AI": "mistralai",
+            "Cohere": "cohere-ai",
+            "AI21 Labs": "AI21Labs",
             "Alibaba (Qwen)": "QwenLM",
             "ByteDance": "bytedance",
             "DeepSeek": "deepseek-ai",
-            "Microsoft AI / Research": "microsoft"
+            "Microsoft AI / Research": "microsoft",
+            "Apple": "apple"
         },
-        "2. Cloud-based Enterprises": {
+        "2. Cloud & Enterprise": {
             "Microsoft Azure": "Azure",
             "Google Cloud": "GoogleCloudPlatform",
             "Amazon AWS": "aws",
             "Oracle Cloud": "oracle",
             "IBM": "IBM",
             "Snowflake": "snowflakedb",
+            "Databricks": "databricks",
             "Salesforce": "salesforce",
             "Alibaba Cloud": "aliyun",
-            "Tencent": "Tencent"
+            "Tencent": "Tencent",
+            "Supabase": "supabase",
+            "Vercel": "vercel"
         },
         "3. Research-based Organizations": {
             "Stability AI": "Stability-AI",
@@ -516,7 +523,10 @@ with tab_orgs:
             "NVIDIA": "NVIDIA",
             "NVIDIA Labs": "NVlabs",
             "Tsinghua/Zhipu (GLM)": "THUDM",
-            "BAAI": "baai-ac"
+            "BAAI": "baai-ac",
+            "PyTorch": "pytorch",
+            "TensorFlow": "tensorflow",
+            "Scikit-learn": "scikit-learn"
         },
         "4. Independent Open Research Collectives": {
             "Nous Research": "NousResearch",
@@ -528,12 +538,22 @@ with tab_orgs:
             "Unsloth AI": "unslothai",
             "Axolotl (OpenAccess AI)": "OpenAccess-AI-Collective",
             "RWKV Foundation": "BlinkDL",
-            "BigScience": "bigscience-workshop"
+            "BigScience": "bigscience-workshop",
+            "vLLM Project": "vllm-project"
         },
-        "5. Independent Breakout Projects": {
+        "5. AI Tools, Frameworks & Breakout Projects": {
+            "LangChain": "langchain-ai",
+            "LlamaIndex": "run-llama",
             "n8n": "n8n-io",
             "Ollama": "ollama",
             "Open WebUI": "open-webui",
+            "AutoGPT": "Significant-Gravitas",
+            "Weaviate": "weaviate",
+            "Qdrant": "qdrant",
+            "Milvus": "milvus-io",
+            "Chroma": "chroma-core",
+            "Weights & Biases": "wandb",
+            "Ray (Anyscale)": "ray-project",
             "TauricResearch": "TauricResearch"
         }
     }
